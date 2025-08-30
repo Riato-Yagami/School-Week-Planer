@@ -63,13 +63,25 @@ function generateWeeksSheet(classes) {
 
     content.push(firstRow)
 
+    weeks.formattedOffDays = []
+    weeks.offDays.forEach(d => {
+        weeks.formattedOffDays.push(d.toLocaleDateString("fr-FR"))
+    })
+
+    // console.log(weeks.offDays)
     // Génération des données hebdomadaires
     for (let week = weeks.first; week <= weeks.last; week++) {
         content.push([emptyCell,{ v: `${week}`, s: weekHeaderStyle }, emptyCell]);
-        if(!weeks.hollidays.includes(week)){
+        if(!weeks.holidays.includes(week)){
             for (let dayOffset = 0; dayOffset < weeks.length; dayOffset++) { // Du lundi au vendredi
-                const day = getDay(week,dayOffset,weeks.startDate)
-                addDay(content,classes,day)
+                const day = getDay(week,dayOffset,weeks.startDate);
+                // console.log(day.formattedDate)
+                // if(weeks.formattedOffDays.includes(day.formattedDate)){
+                //     console.log(`Off day : ${day.formattedDate} (${day.fr})`)
+                //     addDay(content,[],day)
+                // }else{
+                    addDay(content,classes,day)
+                // }
             }
         }
     }
@@ -101,7 +113,7 @@ function generateWeeksSheet(classes) {
             s: { r: rowIndex, c: 1 }, // Début de la fusion (ligne rowIndex, colonne 0)
             e: { r: rowIndex, c: 2 }  // Fin de la fusion (ligne rowIndex, colonne 1)
         });
-        rowIndex += weeks.hollidays.includes(week)? 1 : 6; // Une ligne pour l'en-tête + 5 jours
+        rowIndex += weeks.holidays.includes(week)? 1 : 6; // Une ligne pour l'en-tête + 5 jours
     }
 
     sheet["!cols"] = cols
@@ -129,7 +141,7 @@ function addDay(content,classes,day) {
     const dayStyle = {
         alignment: { horizontal: 'left', vertical: 'center' }, // Centered text
         fill: { // Background color (light blue in this case)
-            fgColor: { rgb: fun.blendColors(white, dateColor,day.id % 2 == 0 ? 0.5 : 1) }
+            fgColor: { rgb: fun.blendColors(white, dateColor, day.id % 2 == 0 ? 0.5 : 1) }
         },
         border: {
             top: (day.id == 0)?  borderStyle : null,
@@ -157,15 +169,36 @@ function addDay(content,classes,day) {
     content.push(day.row); // Ajoute jour et date dans la ligne
 }
 
+function goodWeek(time,day){
+    return (time.week === 0 && day.week % 2 == 0)
+    || (time.week === 1 && day.week % 2 == 1)
+}
+
 function addClass(c,day) {
+    let workableDay = (c[day.name] && !weeks.formattedOffDays.includes(day.formattedDate))
+    
+    if(workableDay){
+        workableDay = false
+        c[day.name].class.forEach(t => {
+            if(t.week != null){
+                // console.log(`  - ${day.fr} (${day.formattedDate}) : ${t.time} (semaine ${t.week == 0 ? 'B' : 'A'})`);
+                if(goodWeek(t,day)){
+                    workableDay = true
+                }
+            }else{
+                workableDay = true
+            }
+        })
+    }
+
     const defaultGradeColor = gradeColors[c.name[Number(0)]]
     const gradeColor = fun.blendColors(white, defaultGradeColor,day.id % 2 == 0 ? 0.75 : 1);
 
-    const emptyStyle = { rgb: fun.blendColors(white, defaultGradeColor, 0.15) }
+    const emptyStyle = { rgb: fun.blendColors(white, defaultGradeColor, 0.05) }
     
     const gradeStyle = {
         fill: { // Background color (light blue in this case)
-            fgColor: c[day.name]? { rgb: fun.blendColors(white, gradeColor, 0.5) } : emptyStyle // Light blue color (RGB code for light blue)
+            fgColor: workableDay? { rgb: fun.blendColors(white, gradeColor, 0.5) } : emptyStyle // Light blue color (RGB code for light blue)
         },
         border: {
             top: (day.id == 0)?  borderStyle : null,
@@ -177,7 +210,7 @@ function addClass(c,day) {
     const gradeTimeStyle = {
         alignment: {horizontal: 'right', vertical: 'center' },
         fill: { // Background color (light blue in this case)
-            fgColor: c[day.name]? { rgb: gradeColor } : emptyStyle // Light blue color (RGB code for light blue)
+            fgColor: workableDay? { rgb: gradeColor } : emptyStyle // Light blue color (RGB code for light blue)
         },
         border: {
             top: (day.id == 0)?  borderStyle : null,
@@ -186,15 +219,14 @@ function addClass(c,day) {
         }
     };
     // classStyle.fill.fgColor.rgb = currentColor;
-    if(c[day.name]){
+    if(workableDay){
         const times = []
-        const coments = []
+        const comments = []
         for (let h = 0; h < c[day.name].class.length; h++) {
             let t = c[day.name].class[h]
 
             if(t.week == null
-                || (t.week === 0 && day.week % 2 == 0)
-                || (t.week === 1 && day.week % 2 == 1)){
+                || goodWeek(t,day)){
                     let time = String(t.time);
                     if (time.includes('.')) {
                         const [hours, minutes] = time.split('.'); // Split into hours and minutes
@@ -203,10 +235,10 @@ function addClass(c,day) {
                         time = `${time.padStart(2, '0')}:00`;
                     }
                     times.push(time)
-                    coments.push(`(${t.coment})` ? t.coment : emptyCell)
+                    comments.push(`(${t.comment})` ? t.comment : emptyCell)
             }
         }
-        day.row.push({ v: times.join(' / '), s: gradeTimeStyle },{ v: coments.join(' / '), s: gradeStyle }) 
+        day.row.push({ v: times.join(' / '), s: gradeTimeStyle },{ v: comments.join(' / '), s: gradeStyle }) 
     }else{
         day.row.push({ v: '', s: gradeTimeStyle },{ v: '', s: gradeStyle })
     }
