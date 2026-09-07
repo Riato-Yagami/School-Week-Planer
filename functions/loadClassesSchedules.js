@@ -2,6 +2,13 @@ const fs = require('fs');
 const path = require('path');
 
 module.exports = () => {
+    if (config.icalExport) {
+        const icalSchedules = fun.loadIcalSchedules();
+        if (icalSchedules) {
+            return icalSchedules;
+        }
+    }
+
     return loadClassesSchedules()
 };
 
